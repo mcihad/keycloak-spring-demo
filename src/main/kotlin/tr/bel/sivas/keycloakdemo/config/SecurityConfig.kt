@@ -19,12 +19,11 @@ class SecurityConfig(private val authoritiesConverter: AuthoritiesConverter) {
     @Bean
     fun authenticationConverter(): GrantedAuthoritiesMapper {
         return GrantedAuthoritiesMapper { authorities ->
-            //filter OidcUserAuthority
             authorities.filterIsInstance<OidcUserAuthority>()
-                .map { it.idToken }
-                .map { it.claims }
-                .map { authoritiesConverter.convert(it) }
-                .flatMap { it?.toList() ?: emptyList() }
+                .flatMap { authority ->
+                    val claims = authority.userInfo?.claims ?: authority.idToken.claims
+                    authoritiesConverter.convert(claims) as Iterable<GrantedAuthority?>
+                }
         }
     }
 
@@ -35,7 +34,7 @@ class SecurityConfig(private val authoritiesConverter: AuthoritiesConverter) {
     ): SecurityFilterChain {
 
         http.invoke {
-            authorizeRequests {
+            authorizeHttpRequests {
                 authorize("/", permitAll)
                 authorize("/user", hasAuthority("user"))
                 authorize("/admin", hasAuthority("admin"))
@@ -52,3 +51,4 @@ class SecurityConfig(private val authoritiesConverter: AuthoritiesConverter) {
         return http.build()
     }
 }
+
